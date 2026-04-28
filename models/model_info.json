@@ -1,0 +1,36 @@
+{
+  "feature_cols": [
+    "Agent_Age",
+    "Agent_Rating",
+    "Distance_km",
+    "Pickup_Hour",
+    "Day_of_Week",
+    "Is_Weekend",
+    "Prep_Minutes",
+    "Weather",
+    "Traffic",
+    "Vehicle",
+    "Area",
+    "Category"
+  ],
+  "categorical_cols": [
+    "Weather",
+    "Traffic",
+    "Vehicle",
+    "Area",
+    "Category"
+  ],
+  "numeric_cols": [
+    "Agent_Age",
+    "Agent_Rating",
+    "Distance_km",
+    "Pickup_Hour",
+    "Day_of_Week",
+    "Is_Weekend",
+    "Prep_Minutes"
+  ],
+  "optimal_threshold": 0.26,
+  "train_delayed_rate": 0.25,
+  "test_roc_auc": 0.9526,
+  "test_f1": 0.7806578087562622
+}

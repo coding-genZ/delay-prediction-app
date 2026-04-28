@@ -1,0 +1,117 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Shipment Delay Prediction API — serverless deployment
+
+Globals:
+  Function:
+    Timeout: 60
+    MemorySize: 1024
+    Runtime: python3.11
+    Environment:
+      Variables:
+        AWS_REGION_NAME: !Ref AWS::Region
+        S3_MODEL_BUCKET: !Ref ModelBucket
+        S3_MODEL_KEY: models/catboost_delay_model.cbm
+        S3_CONFIG_KEY: models/model_info.json
+        DYNAMODB_PREDICTIONS_TABLE: !Ref PredictionsTable
+        CLOUDWATCH_LOG_GROUP: !Ref ApiLogGroup
+        OPENWEATHER_API_KEY: !Ref OpenWeatherApiKey
+
+Parameters:
+  OpenWeatherApiKey:
+    Type: String
+    Default: ""
+    Description: OpenWeatherMap API key (leave empty to skip live weather)
+    NoEcho: true
+
+Resources:
+
+  # --- S3 bucket for model artifacts ---
+  ModelBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "shipment-delay-models-${AWS::AccountId}"
+      VersioningConfiguration:
+        Status: Enabled
+
+  # --- DynamoDB table for predictions + feedback ---
+  PredictionsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: shipment-delay-predictions
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: prediction_id
+          AttributeType: S
+        - AttributeName: timestamp
+          AttributeType: S
+      KeySchema:
+        - AttributeName: prediction_id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: timestamp-index
+          KeySchema:
+            - AttributeName: timestamp
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+
+  # --- CloudWatch log group ---
+  ApiLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /shipment-delay/api
+      RetentionInDays: 30
+
+  # --- Lambda function ---
+  PredictionFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: infra.lambda_handler.handler
+      CodeUri: ..
+      Description: Shipment delay prediction API
+      Policies:
+        - S3ReadPolicy:
+            BucketName: !Ref ModelBucket
+        - DynamoDBCrudPolicy:
+            TableName: !Ref PredictionsTable
+        - CloudWatchLogsFullAccess
+      Events:
+        ApiCatchAll:
+          Type: HttpApi
+          Properties:
+            Path: /{proxy+}
+            Method: ANY
+            ApiId: !Ref HttpApi
+        ApiRoot:
+          Type: HttpApi
+          Properties:
+            Path: /
+            Method: ANY
+            ApiId: !Ref HttpApi
+
+  # --- API Gateway (HTTP API) ---
+  HttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: prod
+      CorsConfiguration:
+        AllowOrigins:
+          - "*"
+        AllowMethods:
+          - GET
+          - POST
+          - OPTIONS
+        AllowHeaders:
+          - Content-Type
+
+Outputs:
+  ApiUrl:
+    Description: Public URL for the prediction API
+    Value: !Sub "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod"
+  ModelBucketName:
+    Description: S3 bucket for model artifacts
+    Value: !Ref ModelBucket
+  PredictionsTableName:
+    Description: DynamoDB table for prediction logs
+    Value: !Ref PredictionsTable

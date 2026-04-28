@@ -1,0 +1,13 @@
+venv/
+__pycache__/
+*.pyc
+catboost_info/
+.env
+*.egg-info/
+dist/
+build/
+.idea/
+.vscode/
+*.bak
+optuna_results.csv
+bias_audit_report.csv
